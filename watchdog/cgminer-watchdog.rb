@@ -33,42 +33,53 @@
 
 require 'socket'
 require 'net/smtp'
+require_relative 'RubyINI'
 
-class CGMinerAPI
+class CGMinerWatchdog
 
   @@supported_metrics = ["mhs_av", "mhs_5s"]
   @@selected_metric = nil
   @@alarm_hashrate = nil
   @@log = nil
+  @@hostname = nil
+  @@mailer_hostname = nil
+  @@mailer_port = nil
+  @@mailer_starttls = false
+  @@mailer_username = nil
+  @@mailer_password = nil
 
-  def initialize(hostname, port, selected_metric, alarm_hashrate, log)
-      socket = TCPSocket.open(hostname, port)
+  def initialize(ini, log)
+      @@log = log
+      @@hostname = ini.cgminer.hostname
+      @@selected_metric = ini.cgminer.selected_metric
+      @@alarm_hashrate = ini.cgminer.alarm_hashrate.to_f
+      @@alarm_recipient = ini.cgminer.alarm_recipient
+      @@mailer_hostname = ini.mailer.hostname
+      @@mailer_port = ini.mailer.port.to_i
+      @@mailer_starttls = ini.mailer.starttls
+      @@mailer_username = ini.mailer.username
+      @@mailer_password = ini.mailer.password
+      socket = TCPSocket.open(@@hostname, ini.cgminer.port)
       socket.write "summary"
       @response = socket.read
-      socket.close
-      @@selected_metric = selected_metric
-      @@alarm_hashrate = alarm_hashrate.to_f
-      @@log = log
+      socket.close     
   end
 
   def parse(metric)
-
     metric_pieces = metric.split("=")
     name = metric_pieces[0].downcase.sub(/ /, "_").sub(/%/, "")
     return if !@@supported_metrics.include? name
     value = metric_pieces[1].to_f
     email_and_exit 10001 if value.nil?
-
     if name == @@selected_metric
        if value < @@alarm_hashrate
-
           flag = @@log.read(1)
-
           if flag.nil?
              @@log.write "1"
-             email_and_exit 0, value, true
+             @@log.close
+             email_warning_and_exit 0, value
           else
-            email_and_exit 10002, value
+             email_error_and_exit 10002, value
           end
        end
        @@log.truncate 0
@@ -77,67 +88,57 @@ class CGMinerAPI
     end
   end
 
-  def summary()
-
+  def test()
     pieces = @response.split("|")
     summary = pieces[1]
     summary_pieces = summary.split(",")
-
     summary_pieces.each do |metric|
       parse metric
     end
   end
 
-  def email_and_exit(code, value = 0, warn = false)
-
-    if warn
-
-       message = <<MESSAGE
-Date: #{Time.new}
-From: root <root@localhost>
+  def email_warning_and_exit(code, value = 0)
+    message = <<MESSAGE
+From: #{@@hostname} <cgminer-watchdog@#{@@hostname}>
 To: Jeremy Hahn <mail@jeremyhahn.com>
-Subject: CGMiner WatchDog
+Subject: CGMiner Watchdog Warning
 
 The CGMiner WatchDog has detected the following warning. Allowing grace period of 1 interval.
 
 Alarm Hashrate: #{@@alarm_hashrate}
 #{@@selected_metric}: #{value}
-
 MESSAGE
-    else   
+    email_and_exit code, message
+  end
 
-      message = <<MESSAGE
-Date: #{Time.new}
-From: root <root@localhost>
+  def email_error_and_exit(code, value = 0)
+    message = <<MESSAGE
+From: #{@@hostname} <cgminer-watchdog@#{@@hostname}>
 To: Jeremy Hahn <mail@jeremyhahn.com>
-Subject: CGMiner WatchDog
+Subject: CGMiner Watchdog Failure
 
 The CGMiner WatchDog has failed with exit code #{code}. The server is being rebooted.
 
 Alarm Hashrate: #{@@alarm_hashrate}
 #{@@selected_metric}: #{value}
-
 MESSAGE
+     email_and_exit code, message
+  end
 
-    end
-
-    smtp = Net::SMTP.new 'mail.makeabyte.com', 587
+  def email_and_exit(code, message)
+    smtp = Net::SMTP.new @@mailer_hostname, @@mailer_port
     smtp.enable_starttls
-    smtp.start("mail.makeabyte.com", "mail@jeremyhahn.com", "*************", :login) do
-      smtp.send_message(message, "root@localhost", "mail@jeremyhahn.com")
+    smtp.start(@@mailer_hostname, @@mailer_username, @@mailer_password, :login) do
+      smtp.send_message(message, "cgminer-watchdog@#{@@hostname}", @@alarm_recipient)
     end
-
-    @@log.close
     exit code
   end
+
 end
 
-hostname = "localhost"
-port = 4028
-selected_metric = "mhs_5s"
-alarm_hashrate = "2.5"
-tmpfile_path = "/tmp/cgminer_watchdog"
-logfile_path = "/var/log/syslog"
+ini = load_config("/opt/miningtools/cgminer-watchdog.ini")
+tmpfile_path = ini.global.tmpfile
+logfile_path = ini.global.logfile
 
 log = File.open(logfile_path, "a")
 tmpfile = nil
@@ -153,6 +154,9 @@ end
 log << "[WatchDog] Feeding cgminer watchdog\n"
 log.close
 
-cgminer = CGMinerAPI.new hostname, port, selected_metric, alarm_hashrate, tmpfile
-cgminer.summary
-cgminer.email_and_exit 10003
+cgminer_watchdog = CGMinerWatchdog.new ini, tmpfile
+cgminer_watchdog.test
+
+tmpfile.close
+cgminer_watchdog.email_error_and_exit 10003
+
