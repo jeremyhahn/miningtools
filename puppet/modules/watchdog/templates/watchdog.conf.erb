@@ -1,0 +1,8 @@
+file             = /var/log/syslog
+test-binary      = /opt/miningtools/cgminer-watchdog.rb
+test-timeout     = 5
+watchdog-device	 = /dev/watchdog
+interval         = <% if @architecture == 'armv6l' %>10<% else %>45<% end %>
+realtime         = yes
+priority         = 1
+<% if @architecture == 'armv6l' %>watchdog-timeout = 10<% end %>

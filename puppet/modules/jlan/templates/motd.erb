@@ -1,0 +1,36 @@
+     ______                          ______________              
+   ___  /______________ ________   ______(_)__  /_____ _______ 
+   __  __ \  __ \_  __ `__ \  _ \  _____  /__  /_  __ `/_  __ \
+   _  / / / /_/ /  / / / / /  __/______  / _  / / /_/ /_  / / /
+   /_/ /_/\____//_/ /_/ /_/\___/_(_)__  /  /_/  \__,_/ /_/ /_/ 
+                                   /___/                       
+<% if @architecture != 'armv6l' %>
+  Board Manufacturer:  <%= @boardmanufacturer %>
+  Board Product Name:  <%= @boardproductname %>
+  Board Serial Number: <%= @boardserialnumber %>
+  Hardware Model:      <%= @hardwaremodel %>
+<% end %>
+  Operating System:    <%= @operatingsystem %>
+  Architecture:        <%= @architecture %>
+
+  Kernel:              <%= @kernel %>
+  Kernel Release:      <%= @kernelrelease %>
+  Kernel Version:      <%= @kernelversion %>
+
+  Processors:          <%= @processorcount %>
+  Memory (size):       <%= @memorysize %>
+  Memory (free):       <%= @memoryfree %>
+  Block Devices:       <%= @blockdevices %>
+  File Systems:        <%= @filesystems %>
+
+  Hostname:            <%= @hostname %>
+  Domain:              <%= @domain %>
+  FQDN:                <%= @fqdn %>
+  IP Address:          <%= @ipaddress %>
+  MAC Address:         <%= @macaddress %>
+
+  Puppet Version:      <%= @puppetversion %>
+  Facter Version       <%= @facterversion %>
+  Ruby Version:        <%= @rubyversion %>
+  
+  Uptime:              <%= @uptime %>

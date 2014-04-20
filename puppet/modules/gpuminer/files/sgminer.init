@@ -1,0 +1,48 @@
+#! /bin/sh
+#
+### BEGIN INIT INFO
+# Provides:          sgminer
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start mining for coins
+# Description:       Coin miner
+### END INIT INFO
+
+export DISPLAY=:0
+export GPU_USE_SYNC_OBJECTS=1
+export GPU_MAX_ALLOC_PERCENT=100
+
+
+case "$1" in
+  start)
+    if [ "$(pidof sgminer)" ] 
+    then
+      echo "sgminer already running..."
+      exit 0
+    fi
+    echo "Starting sgminer..."
+    /usr/bin/screen -d -m -S sgminer /usr/local/bin/sgminer --api-listen --config /etc/sgminer.conf
+    ;;
+  debug)
+   /usr/local/bin/sgminer -n --config /etc/sgminer.conf
+    ;;
+  stop)
+    echo "Stopping sgminer..."
+    killall sgminer
+    ;;
+  restart|force-reload|reload)
+        $0 stop
+	sleep 3
+        $0 start
+  ;;
+  *)
+        echo "Usage: /etc/init.d/sgminer {start|stop|restart|reload|force-reload|status}"
+        exit 1
+  ;;
+
+esac
+
+exit 0
+

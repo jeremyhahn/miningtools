@@ -1,0 +1,17 @@
+[global]
+logfile = /var/log/syslog
+tmpfile = /tmp/cgminer_watchdog
+
+[cgminer]
+hostname = <%= @hostname %>
+port = 4028
+selected_metric = mhs_5s
+alarm_hashrate = <% if @hostname == 'gridseed01' %>0.5<% else %>2.5<% end %>
+alarm_recipient = mail@jeremyhahn.com
+
+[mailer]
+hostname = mail.makeabyte.com
+port = 587
+starttls = true
+username = mail@jeremyhahn.com
+password = *******************
