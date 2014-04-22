@@ -59,8 +59,7 @@ class CGMinerAPI
   
 end
 
-#hostname = 'localhost'
-hostname = 'gpuminer01'
+hostname = 'localhost'
 port = 4028
 
 command = ARGV[0]
@@ -79,4 +78,3 @@ case command
       puts "Invalid command: " + command
 end
 
-# echo -n "summary" | netcat localhost 4028
