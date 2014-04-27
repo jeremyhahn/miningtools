@@ -55,13 +55,13 @@ class Multipool
     end
 end
 
-def send_notification(ini, pool)
+def send_notification(ini, miner, pool)
     mailer = Mailer.new ini.smtp.hostname, ini.smtp.port
     params = {
       :from => "profitability-monitor@#{ini.local.fqdn}",
       :to => ini.profitability.notifications,
       :subject => "Mining Pool Switch",
-      :message => "Switched miners to #{pool}.",
+      :message => "Switched #{miner} to #{pool}.",
       :username => ini.smtp.username,
       :password => ini.smtp.password,
       :starttls => ini.smtp.starttls
@@ -81,13 +81,13 @@ def update_miners_to(most_profitable_pool)
      case most_profitable_pool
         when "wafflepool" then 
           cgminer.switchpool pool_config_index[:wafflepool]
-          send_notification ini, "WafflePool"
+          send_notification ini, miner, "WafflePool"
         when "clevermining" then
           cgminer.switchpool pool_config_index[:clevermining]
-          send_notification ini, "CleverMining"
+          send_notification ini, miner, "CleverMining"
         when "coinshift" then
           cgminer.switchpool pool_config_index[:coinshift]
-          send_notification ini, "Coinshift"
+          send_notification ini, miner, "Coinshift"
      end
   end
 end
@@ -118,20 +118,15 @@ File.open("profitability.db", File::CREAT|File::RDWR) do |db|
      db.close
      update_miners_to most_profitable_pool
      break
-  else
-     pieces = db.read.split("\n")
-     current_pool = pieces[0]
-     last_switched = DateTime.parse pieces[1]
   end
+  
+  pieces = db.read.split("\n")
+  current_pool = pieces[0]
+  last_switched = DateTime.parse pieces[1]
 
-  if current_pool == most_profitable_pool
+  if current_pool == most_profitable_pool || TimeDifference.between(last_switched, Time.new).in_minutes < 15
      db.close
      break
-  end
-
-  if TimeDifference.between(last_switched, Time.new).in_minutes < 15
-    db.close
-    break
   end
 
   db.truncate 0

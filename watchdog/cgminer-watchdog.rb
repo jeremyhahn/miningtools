@@ -43,6 +43,7 @@ class CGMinerWatchdog
   @@alarm_hashrate = nil
   @@log = nil
   @@hostname = nil
+  @@fqdn = nil
   @@mailer_hostname = nil
   @@mailer_port = nil
   @@mailer_starttls = false
@@ -52,6 +53,7 @@ class CGMinerWatchdog
   def initialize(ini, log)
       @@log = log
       @@hostname = ini.local.hostname
+      @@fqdn = ini.local.fqdn
       @@selected_metric = ini.watchdog.selected_metric
       @@alarm_hashrate = ini.watchdog.alarm_hashrate.to_f
       @@alarm_recipient = ini.watchdog.alarm_recipient
@@ -121,7 +123,7 @@ MESSAGE
   def email_and_exit(code, subject, message)
     mailer = Mailer.new @@mailer_hostname, @@mailer_port
     params = {
-      :from => "cgminer-watchdog@#{@@hostname}",
+      :from => "cgminer-watchdog@#{@@fqdn}",
       :to => @@alarm_recipient,
       :subject => subject,
       :message => message,
