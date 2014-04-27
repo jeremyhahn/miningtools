@@ -129,7 +129,7 @@ File.open("profitability.db", File::CREAT|File::RDWR) do |db|
      break
   end
 
-  db.truncate 0
+  db.truncate(0)
   db.write "#{most_profitable_pool}\n#{DateTime.now}"
   db.close
 
