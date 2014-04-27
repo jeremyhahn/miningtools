@@ -1,0 +1,48 @@
+#! /bin/sh
+#
+### BEGIN INIT INFO
+# Provides:          cgminer
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Gridseed SCRYPT miner
+# Description:       Gridseed Altcoin / scrypt miner
+### END INIT INFO
+
+export DISPLAY=:0
+export GPU_USE_SYNC_OBJECTS=1
+export GPU_MAX_ALLOC_PERCENT=100
+
+
+case "$1" in
+  start)
+    if [ "$(pidof cgminer)" ] 
+    then
+      echo "cgminer already running..."
+      exit 0
+    fi
+    echo "Starting cgminer..."
+    /usr/bin/screen -d -m -S cgminer /opt/miningtools/cgminer --config /opt/miningtools/cgminer.conf
+    ;;
+  debug)
+   /usr/local/bin/cgminer -n --config /etc/cgminer.conf
+    ;;
+  stop)
+    echo "Stopping cgminer..."
+    killall cgminer
+    ;;
+  restart|force-reload|reload)
+        $0 stop
+	sleep 3
+        $0 start
+  ;;
+  *)
+        echo "Usage: /etc/init.d/cgminer {start|stop|restart|reload|force-reload|status}"
+        exit 1
+  ;;
+
+esac
+
+exit 0
+

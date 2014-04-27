@@ -23,7 +23,7 @@ case "$1" in
       exit 0
     fi
     echo "Starting sgminer..."
-    /usr/bin/screen -d -m -S sgminer /usr/local/bin/sgminer --api-listen --config /etc/sgminer.conf
+    /usr/bin/screen -d -m -S sgminer /usr/local/bin/sgminer --config /etc/sgminer.conf
     ;;
   debug)
    /usr/local/bin/sgminer -n --config /etc/sgminer.conf

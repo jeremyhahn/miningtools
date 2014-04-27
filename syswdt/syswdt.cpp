@@ -52,7 +52,7 @@
 #define syswdt_wait_pin 42        // Yellow LED
 
 long syswdt_interval       = 120; // max seconds before expiring syswdt timer
-long syswdt_reboot_timeout = 120; // seconds it takes the system to reboot
+long syswdt_reboot_timeout = 180; // seconds it takes the system to reboot
 
 long syswdt_previous = 0;
 
@@ -164,7 +164,7 @@ void loop() {
    Serial.println(syswdt_interval);
 #endif
 
-	 syswdt_reset();
+     syswdt_reset();
      powercycle();
      syswdt_reset();
   }

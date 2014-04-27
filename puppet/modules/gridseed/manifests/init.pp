@@ -1,24 +1,43 @@
 class gridseed {
 
-    file { 'cgminer-api-zencommand.rb':
-        ensure => file,
-        mode => 0770,
-        owner => root,
-        group => zenoss,
-        path => '/opt/zenoss/libexec/cgminer-api-zencommand.rb',
-        source => "puppet:///modules/gridseed/cgminer-api-zencommand.rb",
-	subscribe => File['/opt/zenoss/libexec']
+    package { 'screen':
+        ensure => present
     }
 
-    file { 'miner.conf':
-        path    => '/opt/minepeon/etc/miner.conf',
+    package { 'mailutils':
+        ensure => present
+    }
+
+    file { 'cgminer.conf':
+        path    => '/opt/miningtools/cgminer.conf',
         ensure  => file,
         source  => "puppet:///modules/gridseed/cgminer.conf"
     }
 
     file { 'cgminer':
-        path    => '/opt/minepeon/bin/cgminer',
+        path    => '/opt/miningtools/cgminer',
         ensure  => file,
         source  => "puppet:///modules/gridseed/cgminer"
+    }
+
+    file { 'cgminer.init':
+        path    => '/etc/init.d/cgminer',
+        ensure  => file,
+        mode => 700,
+        source  => "puppet:///modules/gridseed/cgminer.init"
+    }
+
+    service { 'cgminer':
+        ensure => running,
+        enable => true,
+        hasstatus => true,
+        subscribe => File['cgminer.conf']
+    }
+
+    file { 'mathkernel':
+        path    => '/etc/init.d/mathkernel',
+        ensure  => file,
+        mode => 770,
+        source  => "puppet:///modules/gridseed/mathkernel"
     }
 }

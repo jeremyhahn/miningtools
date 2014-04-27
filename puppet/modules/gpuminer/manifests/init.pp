@@ -12,7 +12,7 @@ class gpuminer {
 	source => 'puppet:///modules/gpuminer/xdm-config'
     }
 
-    file { 'sgminer.conf':
+    file { '/etc/sgminer.conf':
         path    => '/etc/sgminer.conf',
         ensure  => file,
         source  => 'puppet:///modules/gpuminer/sgminer.conf'
@@ -30,16 +30,6 @@ class gpuminer {
 	enable => true,
         hasstatus => true,
 	subscribe => File['/etc/sgminer.conf']
-    }
-
-    file { 'cgminer-api-zencommand.rb':
-        ensure => file,
-        mode => 0770,
-        owner => root,
-        group => zenoss,
-        path => '/opt/zenoss/libexec/cgminer-api-zencommand.rb',
-        source => "puppet:///modules/gpuminer/cgminer-api-zencommand.rb",
-	subscribe => File['/opt/zenoss/libexec']
     }
 
     file { 'aticonfig-api-zencommand.rb':

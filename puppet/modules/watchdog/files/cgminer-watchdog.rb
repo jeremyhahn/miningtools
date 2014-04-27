@@ -33,7 +33,8 @@
 
 require 'socket'
 require 'net/smtp'
-require_relative 'RubyINI'
+require_relative 'lib/RubyINI'
+require_relative 'lib/Mailer'
 
 class CGMinerWatchdog
 
@@ -50,16 +51,16 @@ class CGMinerWatchdog
 
   def initialize(ini, log)
       @@log = log
-      @@hostname = ini.cgminer.hostname
-      @@selected_metric = ini.cgminer.selected_metric
-      @@alarm_hashrate = ini.cgminer.alarm_hashrate.to_f
-      @@alarm_recipient = ini.cgminer.alarm_recipient
-      @@mailer_hostname = ini.mailer.hostname
-      @@mailer_port = ini.mailer.port.to_i
-      @@mailer_starttls = ini.mailer.starttls
-      @@mailer_username = ini.mailer.username
-      @@mailer_password = ini.mailer.password
-      socket = TCPSocket.open(@@hostname, ini.cgminer.port)
+      @@hostname = ini.local.hostname
+      @@selected_metric = ini.watchdog.selected_metric
+      @@alarm_hashrate = ini.watchdog.alarm_hashrate.to_f
+      @@alarm_recipient = ini.watchdog.alarm_recipient
+      @@mailer_hostname = ini.smtp.hostname
+      @@mailer_port = ini.smtp.port.to_i
+      @@mailer_starttls = ini.smtp.starttls
+      @@mailer_username = ini.smtp.username
+      @@mailer_password = ini.smtp.password
+      socket = TCPSocket.open(ini.cgminer.hostname, ini.cgminer.port)
       socket.write "summary"
       @response = socket.read
       socket.close     
@@ -99,46 +100,44 @@ class CGMinerWatchdog
 
   def email_warning_and_exit(code, value = 0)
     message = <<MESSAGE
-From: #{@@hostname} <cgminer-watchdog@#{@@hostname}>
-To: Jeremy Hahn <mail@jeremyhahn.com>
-Subject: CGMiner Watchdog Warning
-
 The CGMiner WatchDog has detected the following warning. Allowing grace period of 1 interval.
 
 Alarm Hashrate: #{@@alarm_hashrate}
 #{@@selected_metric}: #{value}
 MESSAGE
-    email_and_exit code, message
+    email_and_exit code, "CGMiner Watchdog Warning", message
   end
 
   def email_error_and_exit(code, value = 0)
     message = <<MESSAGE
-From: #{@@hostname} <cgminer-watchdog@#{@@hostname}>
-To: Jeremy Hahn <mail@jeremyhahn.com>
-Subject: CGMiner Watchdog Failure
-
 The CGMiner WatchDog has failed with exit code #{code}. The server is being rebooted.
 
 Alarm Hashrate: #{@@alarm_hashrate}
 #{@@selected_metric}: #{value}
 MESSAGE
-     email_and_exit code, message
+     email_and_exit code, "CGMiner Watchdog Failure", message
   end
 
-  def email_and_exit(code, message)
-    smtp = Net::SMTP.new @@mailer_hostname, @@mailer_port
-    smtp.enable_starttls
-    smtp.start(@@mailer_hostname, @@mailer_username, @@mailer_password, :login) do
-      smtp.send_message(message, "cgminer-watchdog@#{@@hostname}", @@alarm_recipient)
-    end
+  def email_and_exit(code, subject, message)
+    mailer = Mailer.new @@mailer_hostname, @@mailer_port
+    params = {
+      :from => "cgminer-watchdog@#{@@hostname}",
+      :to => @@alarm_recipient,
+      :subject => subject,
+      :message => message,
+      :username => @@mailer_username,
+      :password => @@mailer_password,
+      :starttls => @@mailer_starttls
+    }
+    mailer.send params
     exit code
   end
 
 end
 
-ini = load_config("/opt/miningtools/cgminer-watchdog.ini")
-tmpfile_path = ini.global.tmpfile
-logfile_path = ini.global.logfile
+ini = RubyINI.load("/opt/miningtools/lib/miningtools.ini")
+tmpfile_path = ini.watchdog.tmpfile
+logfile_path = ini.watchdog.logfile
 
 log = File.open(logfile_path, "a")
 tmpfile = nil
@@ -159,4 +158,5 @@ cgminer_watchdog.test
 
 tmpfile.close
 cgminer_watchdog.email_error_and_exit 10003
+
 
