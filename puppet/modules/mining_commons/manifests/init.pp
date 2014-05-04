@@ -61,4 +61,14 @@ class mining_commons {
         content => template("mining_commons/miningtools.ini.erb"),
         subscribe => File['/opt/miningtools/lib']
     }
+
+    file { 'CloudFlare.rb':
+        ensure => file,
+        mode => 0770,
+        owner => root,
+        group => zenoss,
+        path => '/opt/miningtools/lib/CloudFlare.rb',
+        source => "puppet:///modules/mining_commons/CloudFlare.rb",
+        subscribe => File['/opt/miningtools/lib']
+    }
 }

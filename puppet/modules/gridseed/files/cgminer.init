@@ -23,7 +23,7 @@ case "$1" in
       exit 0
     fi
     echo "Starting cgminer..."
-    /usr/bin/screen -d -m -S cgminer /opt/miningtools/cgminer --config /opt/miningtools/cgminer.conf
+    /usr/bin/screen -d -m -S cgminer /opt/miningtools/cgminer --api-listen --config /opt/miningtools/cgminer.conf
     ;;
   debug)
    /usr/local/bin/cgminer -n --config /etc/cgminer.conf

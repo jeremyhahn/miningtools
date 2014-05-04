@@ -20,8 +20,8 @@ class WafflePool
     def hashrate
         captured_hashrate = @@html.match(/Hash Rate:\<\/b\>\s([0-9]*\.?[0-9]*)\s(M?k?)H\/s/m).captures
         return 0 if captured_hashrate == nil || captured_hashrate.length < 2
-        return captured_hashrate[0].to_i * 1000 if captured_hashrate[1] == "k"
-        return captured_hashrate[0].to_i * 1000000 if captured_hashrate[1] == "M"
+        return captured_hashrate[0].to_f * 1000 if captured_hashrate[1] == "k"
+        return captured_hashrate[0].to_f * 1000000 if captured_hashrate[1] == "M"
     end
     
     def stalerate

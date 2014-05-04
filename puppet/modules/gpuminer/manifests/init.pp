@@ -1,7 +1,7 @@
 class gpuminer {
 
      package { ['libncurses5-dev', 'libcurl4-openssl-dev', 'build-essential', 'libxrandr2',
-               'pkg-config', 'libtool', 'xorg', 'xdm', 'linux-headers-2.6.32-5-amd64',
+               'pkg-config', 'libtool', 'xorg', 'xdm', 'linux-headers-2.6.32-5-amd64', 'unzip',
                'autoconf', 'libudev-dev', 'git', 'screen']:
         ensure => present
     }

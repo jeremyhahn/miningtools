@@ -7,7 +7,7 @@ logfile = /var/log/syslog
 tmpfile = /tmp/cgminer_watchdog
 selected_metric = mhs_5s
 alarm_hashrate = <% if @architecture == 'armv6l' %>0.5<% else %>2.5<% end %>
-alarm_recipient = localhost
+alarm_recipient = root@localhost
 
 [cgminer]
 hostname = localhost
@@ -23,3 +23,8 @@ password = *************
 [profitability]
 notifications = *************
 miners = miner01.localdomain, miner02.localdomain, miner02.localdomain
+
+[coinbase]
+apikey=**************
+secret=**************
+

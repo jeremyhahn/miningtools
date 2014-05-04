@@ -1,10 +1,6 @@
 class gridseed {
 
-    package { 'screen':
-        ensure => present
-    }
-
-    package { 'mailutils':
+    package { ['screen', 'mailutils']:
         ensure => present
     }
 

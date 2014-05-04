@@ -1,25 +1,11 @@
 #!/usr/bin/ruby
 
-require "typhoeus"
 require "date"
 require "time_difference"
+require_relative "lib/CloudFlare"
 require_relative "lib/CGMinerAPI"
 require_relative "lib/RubyINI"
 require_relative "lib/Mailer"
-
-class CloudFlare
-    def self.scrape(url)
-        response = Typhoeus::Request.get(url, cookiefile: ".typhoeus_cookies", cookiejar: ".typhoeus_cookies")
-        body = response.response_body
-        challenge = body.match(/name="jschl_vc"\s*value="([a-zA-Z0-9]+)"\/\>/).captures[0]
-        math = body.match(/a\.value\s*=\s*(\d.+?);/).captures[0]
-        domain = url.split("/")[2]
-        answer = eval(math) + domain.length
-        answer_url = domain + "/cdn-cgi/l/chk_jschl?jschl_vc=#{challenge}&jschl_answer=#{answer}"
-        html = Typhoeus.get(answer_url,  followlocation: true)
-        return html.response_body
-    end
-end
 
 class WafflePool
     def self.get_btc_per_mh
@@ -46,22 +32,19 @@ end
 
 class Multipool
     def self.get_btc_per_mh
-        response = Typhoeus.get("https://www.multipool.us", followlocation: true)
-        
-        p response
-        
-        html = response.response_body
-        return html.match(/1\sday.*?\<\/td\>\<td\>([0-9]*\.?[0-9]*)\<\/td\>\<td\>/).captures[0]
+        response = Typhoeus.get("http://api.multipool.us/api.php")
+        json = JSON.parse(response.response_body)
+        return json["prof"]["scrypt_1d"].to_f
     end
 end
 
-def send_notification(ini, miner, pool)
+def send_notification(ini, message)
     mailer = Mailer.new ini.smtp.hostname, ini.smtp.port
     params = {
       :from => "profitability-monitor@#{ini.local.fqdn}",
       :to => ini.profitability.notifications,
-      :subject => "Mining Pool Switch",
-      :message => "Switched #{miner} to #{pool}.",
+      :subject => "Profitability Monitor",
+      :message => message,
       :username => ini.smtp.username,
       :password => ini.smtp.password,
       :starttls => ini.smtp.starttls
@@ -77,17 +60,22 @@ def update_miners_to(most_profitable_pool)
     :coinshift => 2
   }
   ini.profitability.miners.each do |miner|
-     cgminer = CGMinerAPI.new miner, 4028
-     case most_profitable_pool
-        when "wafflepool" then 
-          cgminer.switchpool pool_config_index[:wafflepool]
-          send_notification ini, miner, "WafflePool"
-        when "clevermining" then
-          cgminer.switchpool pool_config_index[:clevermining]
-          send_notification ini, miner, "CleverMining"
-        when "coinshift" then
-          cgminer.switchpool pool_config_index[:coinshift]
-          send_notification ini, miner, "Coinshift"
+     begin
+       cgminer = CGMinerAPI.new miner, 4028
+       case most_profitable_pool
+          when "wafflepool" then 
+            cgminer.switchpool pool_config_index[:wafflepool]
+            send_notification ini, "Switched #{miner} to WafflePool."
+          when "clevermining" then
+            cgminer.switchpool pool_config_index[:clevermining]
+            send_notification ini,  "Switched #{miner} to CleverMining."
+          when "coinshift" then
+            cgminer.switchpool pool_config_index[:coinshift]
+            send_notification ini, "Switched #{miner} to CoinShift."
+       end
+     rescue
+       send_notification ini, "Failed to update miner #{miner}."
+       next
      end
   end
 end
@@ -95,8 +83,9 @@ end
 wafflepool_btc_per_mh   = WafflePool.get_btc_per_mh
 clevermining_btc_per_mh = CleverMining.get_btc_per_mh
 coinshift_btc_per_mh    = Coinshift.get_btc_per_mh
+multipool_btc_per_mh    = Multipool.get_btc_per_mh
 
-zenresponse = "OK|wafflepool=#{wafflepool_btc_per_mh} clevermining=#{clevermining_btc_per_mh} coinshift=#{coinshift_btc_per_mh}"
+zenresponse = "OK|wafflepool=#{wafflepool_btc_per_mh} clevermining=#{clevermining_btc_per_mh} coinshift=#{coinshift_btc_per_mh} multipool=#{multipool_btc_per_mh}"
 puts zenresponse
 
 # Make sure miners are working on the most profitable pool
@@ -108,30 +97,26 @@ if coinshift_btc_per_mh > wafflepool_btc_per_mh && coinshift_btc_per_mh > clever
    most_profitable_pool = "coinshift"
 end
 
-File.open("profitability.db", File::CREAT|File::RDWR) do |db|
+File.open("profitability.db", "r+") { |db|
 
   current_pool = most_profitable_pool
   last_switched = DateTime.now
 
   if db.size == 0
-     db.write "#{most_profitable_pool}\n#{DateTime.now}"
-     db.close
+     db.puts most_profitable_pool + "\n" + DateTime.now.to_s
      update_miners_to most_profitable_pool
      break
   end
   
   pieces = db.read.split("\n")
-  current_pool = pieces[0]
+  current_pool = pieces[0].strip
   last_switched = DateTime.parse pieces[1]
+  
+  if current_pool != most_profitable_pool && TimeDifference.between(last_switched, Time.new).in_minutes > 5
 
-  if current_pool == most_profitable_pool || TimeDifference.between(last_switched, Time.new).in_minutes < 15
-     db.close
-     break
+     db.truncate(0)
+     db.puts most_profitable_pool + "\n" + DateTime.now.to_s
+
+     update_miners_to most_profitable_pool
   end
-
-  db.truncate(0)
-  db.write "#{most_profitable_pool}\n#{DateTime.now}"
-  db.close
-
-  update_miners_to most_profitable_pool
-end
+}
