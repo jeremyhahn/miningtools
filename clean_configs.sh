@@ -34,3 +34,7 @@ sed -i 's/^AuthPass=.*$/AuthPass=**************/g' puppet/modules/ssmtp/files/ss
 
 rm -rf puppet/modules/.git
 rm puppet/modules/site.pp
+rm puppet/modules/gpuminer/files/AMD-APP-SDK-v2.9-lnx64.tgz
+rm puppet/modules/gpuminer/files/amd-catalyst-13.12-linux-x86.x86_64.run
+rm puppet/modules/gpuminer/files/amd-driver-installer-14.10.1006-x86.x86_64.zip
+rm puppet/modules/gpuminer/files/amd-driver-installer-14.10.1006-x86.x86_64.run

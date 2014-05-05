@@ -1,0 +1,99 @@
+<html>
+	<head>
+		<script src="https://code.jquery.com/jquery-2.1.0.min.js"></script>
+		<script src="http://code.highcharts.com/highcharts.js"></script>
+		<script src="http://code.highcharts.com/modules/exporting.js"></script>
+
+		<script type="text/javascript">
+			$(function () {
+
+				$('#btctd').highcharts({
+		            title: {
+		                text: 'All Bitcoins (<%= @total_btc %>)',
+		                x: -20 //center
+		            },
+		            subtitle: {
+		                text: 'Source: mining.jeremyhahn.com',
+		                x: -20
+		            },
+		            xAxis: {
+		                categories: <%= @total_btc_by_day.keys.reverse %>
+		            },
+		            yAxis: {
+		                title: {
+		                    text: 'BTC'
+		                },
+		                plotLines: [{
+		                    value: 0,
+		                    width: 1,
+		                    color: '#808080'
+		                }]
+		            },
+		            tooltip: {
+		                valueSuffix: 'BTC'
+		            },
+		            legend: {
+		                layout: 'vertical',
+		                align: 'right',
+		                verticalAlign: 'middle',
+		                borderWidth: 0
+		            },
+		            series: [{
+		                name: '<%= @wallet_address %>',
+		                data: <%= @total_btc_by_day.values.reverse %>
+		            }]
+		        });
+
+			    <% @total_btc_per_month_by_day.each do |month| %>
+
+		        $('#btc_per_month_<%= month.number %>').highcharts({
+		            title: {
+		                text: 'Bitcoins in <%= month.name %> <%= month.year %> (<%= month.total_btc %>)',
+		                x: -20 //center
+		            },
+		            subtitle: {
+		                text: 'Source: mining.jeremyhahn.com',
+		                x: -20
+		            },
+		            xAxis: {
+		                categories: <%= month.dates %>
+		            },
+		            yAxis: {
+		                title: {
+		                    text: 'BTC'
+		                },
+		                plotLines: [{
+		                    value: 0,
+		                    width: 1,
+		                    color: '#808080'
+		                }]
+		            },
+		            tooltip: {
+		                valueSuffix: 'BTC'
+		            },
+		            legend: {
+		                layout: 'vertical',
+		                align: 'right',
+		                verticalAlign: 'middle',
+		                borderWidth: 0
+		            },
+		            series: [{
+		                name: '<%= @wallet_address %>',
+		                data: <%= month.amounts %>
+		            }]
+		        });
+
+		        <% end %>
+
+		    });
+		</script>
+   </head>
+
+    <body>
+    	<div id="btctd" style="min-width: 310px; height: 400px; margin: 0 auto"> </div>
+    	<% @total_btc_per_month_by_day.each do |month| %>
+    	<div id="btc_per_month_<%= month.number %>" style="min-width: 310px; height: 400px; margin: 0 auto"> </div>
+    	<% end %>
+    </body>
+
+</html>

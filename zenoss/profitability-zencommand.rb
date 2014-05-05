@@ -97,26 +97,26 @@ if coinshift_btc_per_mh > wafflepool_btc_per_mh && coinshift_btc_per_mh > clever
    most_profitable_pool = "coinshift"
 end
 
-File.open("profitability.db", "r+") { |db|
+File.open("profitability.db", File::CREAT|File::RDWR) { |db|
 
   current_pool = most_profitable_pool
   last_switched = DateTime.now
+  data = "#{most_profitable_pool}|#{DateTime.now}"
 
   if db.size == 0
-     db.puts most_profitable_pool + "\n" + DateTime.now.to_s
+     db. puts data
      update_miners_to most_profitable_pool
      break
   end
   
-  pieces = db.read.split("\n")
+  pieces = db.read.split("|")
   current_pool = pieces[0].strip
   last_switched = DateTime.parse pieces[1]
-  
+  data = "#{most_profitable_pool}|#{DateTime.now}"
+
   if current_pool != most_profitable_pool && TimeDifference.between(last_switched, Time.new).in_minutes > 5
-
-     db.truncate(0)
-     db.puts most_profitable_pool + "\n" + DateTime.now.to_s
-
+     db.truncate 0
+     db.puts data
      update_miners_to most_profitable_pool
   end
 }
