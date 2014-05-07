@@ -33,7 +33,8 @@ end
 class Multipool
     def self.get_btc_per_mh
         response = Typhoeus.get("http://api.multipool.us/api.php")
-        json = JSON.parse(response.response_body)
+        body = response.response_body.gsub(/<!--.*->/, "")
+        json = JSON.parse(body)
         return json["prof"]["scrypt_1d"].to_f
     end
 end
