@@ -39,46 +39,105 @@ class Multipool
     end
 end
 
-def send_notification(ini, message)
-    mailer = Mailer.new ini.smtp.hostname, ini.smtp.port
+class Profitability
+
+  @@ini = nil
+  @@pools = nil
+  @@pool_config_indexes = nil
+  @@database = "profitability.db"
+
+  def initialize(pools, pool_config_indexes)
+    @@pools = pools
+    @@pool_config_indexes = pool_config_indexes
+    @@ini = RubyINI.load("/opt/miningtools/lib/miningtools.ini")
+  end
+
+  def db_read
+    data = nil
+    if File.exist?(@@database)
+       File.open(@@database, "r") do |db|
+         data = db.gets
+       end
+    end
+    return data
+  end
+
+  def db_write(data)
+    File.open(@@database, "w+") do |db|
+      db.puts data
+    end
+  end
+
+  def mine_most_profitable
+
+    most_profitable_pool = find_most_profitable_pool
+    data = db_read
+    record = "#{most_profitable_pool}|#{DateTime.now}"
+
+    if data == nil
+      db_write record
+      update_miners_to most_profitable_pool
+      return nil
+    end
+
+    pieces = data.split("|")
+    current_pool = pieces[0].strip
+    last_switched = DateTime.parse pieces[1]
+    time_difference = TimeDifference.between(last_switched, Time.new).in_minutes
+
+    if current_pool != most_profitable_pool && time_difference > 5
+       db_write record
+       update_miners_to most_profitable_pool
+    end
+  end
+
+  def find_most_profitable_pool
+    most_profitable_pool = "wafflepool"
+    if @@pools[:clevermining_btc_per_mh] > @@pools[:wafflepool_btc_per_mh]
+       most_profitable_pool = "clevermining"
+    end
+    if @@pools[:coinshift_btc_per_mh] > @@pools[:wafflepool_btc_per_mh] && @@pools[:coinshift_btc_per_mh] > @@pools[:clevermining_btc_per_mh]
+       most_profitable_pool = "coinshift"
+    end
+    return most_profitable_pool
+  end
+
+  def send_notification(message)
+    mailer = Mailer.new @@ini.smtp.hostname, @@ini.smtp.port
     params = {
-      :from => "profitability-monitor@#{ini.local.fqdn}",
-      :to => ini.profitability.notifications,
+      :from => "profitability-monitor@#{@@ini.local.fqdn}",
+      :to => @@ini.profitability.notifications,
       :subject => "Profitability Monitor",
       :message => message,
-      :username => ini.smtp.username,
-      :password => ini.smtp.password,
-      :starttls => ini.smtp.starttls
+      :username => @@ini.smtp.username,
+      :password => @@ini.smtp.password,
+      :starttls => @@ini.smtp.starttls
     }
     mailer.send params
-end
-
-def update_miners_to(most_profitable_pool)
-  ini = RubyINI.load("/opt/miningtools/lib/miningtools.ini")
-  pool_config_index = {
-    :wafflepool => 0,
-    :clevermining => 1,
-    :coinshift => 2
-  }
-  ini.profitability.miners.each do |miner|
-     begin
-       cgminer = CGMinerAPI.new miner, 4028
-       case most_profitable_pool
-          when "wafflepool" then 
-            cgminer.switchpool pool_config_index[:wafflepool]
-            send_notification ini, "Switched #{miner} to WafflePool."
-          when "clevermining" then
-            cgminer.switchpool pool_config_index[:clevermining]
-            send_notification ini,  "Switched #{miner} to CleverMining."
-          when "coinshift" then
-            cgminer.switchpool pool_config_index[:coinshift]
-            send_notification ini, "Switched #{miner} to CoinShift."
-       end
-     rescue
-       send_notification ini, "Failed to update miner #{miner}."
-       next
-     end
   end
+
+  def update_miners_to(most_profitable_pool)
+    @@ini.profitability.miners.each do |miner|
+       begin
+         cgminer = CGMinerAPI.new miner, 4028
+         case most_profitable_pool
+            when "wafflepool" then 
+              cgminer.switchpool @@pool_config_indexes[:wafflepool]
+              send_notification "Switched #{miner} to WafflePool."
+            when "clevermining" then
+              cgminer.switchpool @@pool_config_indexes[:clevermining]
+              send_notification "Switched #{miner} to CleverMining."
+            when "coinshift" then
+              cgminer.switchpool @@pool_config_indexes[:coinshift]
+              send_notification "Switched #{miner} to CoinShift."
+         end
+       rescue
+         send_notification "Failed to update miner #{miner}."
+         next
+       end
+    end
+  end
+
 end
 
 wafflepool_btc_per_mh   = WafflePool.get_btc_per_mh
@@ -89,35 +148,18 @@ multipool_btc_per_mh    = Multipool.get_btc_per_mh
 zenresponse = "OK|wafflepool=#{wafflepool_btc_per_mh} clevermining=#{clevermining_btc_per_mh} coinshift=#{coinshift_btc_per_mh} multipool=#{multipool_btc_per_mh}"
 puts zenresponse
 
-# Make sure miners are working on the most profitable pool
-most_profitable_pool = "wafflepool"
-if clevermining_btc_per_mh > wafflepool_btc_per_mh
-   most_profitable_pool = "clevermining"
-end
-if coinshift_btc_per_mh > wafflepool_btc_per_mh && coinshift_btc_per_mh > clevermining_btc_per_mh
-   most_profitable_pool = "coinshift"
-end
-
-File.open("profitability.db", File::CREAT|File::RDWR) { |db|
-
-  current_pool = most_profitable_pool
-  last_switched = DateTime.now
-  data = "#{most_profitable_pool}|#{DateTime.now}"
-
-  if db.size == 0
-     db. puts data
-     update_miners_to most_profitable_pool
-     break
-  end
-  
-  pieces = db.read.split("|")
-  current_pool = pieces[0].strip
-  last_switched = DateTime.parse pieces[1]
-  data = "#{most_profitable_pool}|#{DateTime.now}"
-
-  if current_pool != most_profitable_pool && TimeDifference.between(last_switched, Time.new).in_minutes > 5
-     db.truncate 0
-     db.puts data
-     update_miners_to most_profitable_pool
-  end
+pools = {
+  :wafflepool_btc_per_mh => wafflepool_btc_per_mh,
+  :clevermining_btc_per_mh => clevermining_btc_per_mh,
+  :coinshift_btc_per_mh => coinshift_btc_per_mh
 }
+
+pool_config_indexes = {
+  :wafflepool => 0,
+  :clevermining => 1,
+  :coinshift => 2
+}
+
+profitability = Profitability.new pools, pool_config_indexes
+profitability.mine_most_profitable
+
