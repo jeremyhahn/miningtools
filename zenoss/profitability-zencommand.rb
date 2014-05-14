@@ -122,6 +122,9 @@ class Profitability
        most_profitable_pool = "coinsolver"
        most_profitable_btc_per_mh = @@pools[:coinsolver_btc_per_mh]
     end
+    if @@pools[:clevermining_btc_per_mh] > @@pools[:wafflepool_btc_per_mh]
+       most_profitable_pool = "clevermining"
+    end
     return most_profitable_pool
   end
 
@@ -191,6 +194,6 @@ pool_config_indexes = {
   :coinsolver => 3
 }
 
-
 profitability = Profitability.new ini, pools, pool_config_indexes
 profitability.mine_most_profitable
+
