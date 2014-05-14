@@ -2,15 +2,17 @@
 
 require "net/http"
 require "uri"
+require "json"
 
 class WafflePool
 
-    @@html = nil
+    @@json = nil
 
     def initialize(address)
-      uri = URI.parse("http://wafflepool.com/miner/#{address}")
+      uri = URI.parse("http://wafflepool.com/tmp_api?address=#{address}")
       http = Net::HTTP.new(uri.host, uri.port)
-      @@html = http.request(Net::HTTP::Get.new(uri.request_uri)).body
+      body = http.request(Net::HTTP::Get.new(uri.request_uri)).body
+      @@json = JSON.parse(body)
     end
 
     def parse_date(str_date) 
@@ -18,35 +20,32 @@ class WafflePool
     end
 
     def hashrate
-        captured_hashrate = @@html.match(/Hash Rate:\<\/b\>\s([0-9]*\.?[0-9]*)\s(M?k?)H\/s/m).captures
-        return 0 if captured_hashrate == nil || captured_hashrate.length < 2
-        return captured_hashrate[0].to_f * 1000 if captured_hashrate[1] == "k"
-        return captured_hashrate[0].to_f * 1000000 if captured_hashrate[1] == "M"
+        captured_hashrate = @@json['hash_rate'].to_f
+        str_hashrate = @@json['hash_rate_str']
+        return captured_hashrate * 1000 if str_hashrate.include?("kH")
+        return captured_hashrate * 1000000 if str_hashrate.include?("MH")
     end
-    
+
     def stalerate
-      return @@html.match(/([0-9]*\.?[0-9]*)%\<\/td\>/m).captures[0] || 0
+      return @@json['worker_hashrates'][0]['stalerate'].to_f
     end
 
     def btc_payout_total
-      return @@html.match(/\<b\>Bitcoins\ssent.*?\s([0-9]*\.[0-9]*)\<br\>/).captures[0] || 0
+      return @@json['balances']['sent']
     end
 
     def btc_payout_expected
-      return @@html.match(/\<b\>Bitcoins\sexpected.*\s([0-9]*\.[0-9]*)\<br\>/m).captures[0] || 0
+      return @@json['balances']['unconverted'].to_f
     end
 
     def btc_recently_paid
-      btc_payout_recent = @@html.scan(/\<td\>(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}).*\n\<td\>([0-9]*\.?[0-9]*).*?\<\/td\>/) || 0
-      last_date = nil
+      last_date = parse_date Time.new.to_s
       btc_payout_today = 0
-      btc_payout_recent.each do |datetime, amount|
-        if last_date == nil
-          last_date = parse_date datetime
-        end
-        next if amount.empty?
-        next if last_date != (parse_date datetime)
-        btc_payout_today += amount.to_f
+      @@json['recent_payments'].each do |recent|
+        date = parse_date recent['time']
+        break if date != last_date || date.nil?
+        last_date = date
+        btc_payout_today += recent['amount'].to_f
       end
       return btc_payout_today
     end
@@ -61,3 +60,4 @@ end
 wafflepool = WafflePool.new address
 zenresponse = "OK|hashrate=#{wafflepool.hashrate} stalerate=#{wafflepool.stalerate} btc_expected=#{wafflepool.btc_payout_expected} btc_total_paid=#{wafflepool.btc_payout_total} btc_recently_paid=#{wafflepool.btc_recently_paid}"
 puts zenresponse
+
