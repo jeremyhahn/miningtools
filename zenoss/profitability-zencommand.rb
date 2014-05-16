@@ -68,12 +68,10 @@ class Profitability
 
   @@ini = nil
   @@pools = nil
-  @@pool_config_indexes = nil
   @@database = "profitability.db"
 
-  def initialize(ini, pools, pool_config_indexes)
+  def initialize(ini, pools)
     @@pools = pools
-    @@pool_config_indexes = pool_config_indexes
     @@ini = ini
   end
 
@@ -117,22 +115,13 @@ class Profitability
   end
 
   def find_most_profitable_pool
-    most_profitable_pool = "wafflepool"
-    most_profitable_btc_per_mh = @@pools[:wafflepool_btc_per_mh]
-    if @@pools[:clevermining_btc_per_mh] > most_profitable_btc_per_mh
-       most_profitable_pool = "clevermining"
-       most_profitable_btc_per_mh = @@pools[:clevermining_btc_per_mh]
-    end
-    if @@pools[:coinshift_btc_per_mh] > most_profitable_btc_per_mh
-       most_profitable_pool = "coinshift"
-       most_profitable_btc_per_mh = @@pools[:coinshift_btc_per_mh]
-    end
-    if @@pools[:coinsolver_btc_per_mh] > most_profitable_btc_per_mh
-       most_profitable_pool = "coinsolver"
-       most_profitable_btc_per_mh = @@pools[:coinsolver_btc_per_mh]
-    end
-    if @@pools[:clevermining_btc_per_mh] > @@pools[:wafflepool_btc_per_mh]
-       most_profitable_pool = "clevermining"
+    most_profitable_pool = nil
+    most_profitable_btc_per_mh = 0
+    @@pools.each do |k, pool|
+      if pool.btc_per_mh > most_profitable_btc_per_mh
+        most_profitable_pool = pool.name
+        most_profitable_btc_per_mh = pool.btc_per_mh
+      end
     end
     return most_profitable_pool
   end
@@ -152,30 +141,44 @@ class Profitability
   end
 
   def update_miners_to(most_profitable_pool)
-    @@ini.profitability.miners.each do |miner|
-       begin
+    @@pools.each do |k, pool|
+
+      next if pool.name != most_profitable_pool
+
+      @@ini.profitability.scryptn_miners.each do |miner|
          cgminer = CGMinerAPI.new miner, 4028
-         case most_profitable_pool
-            when "wafflepool" then 
-              cgminer.switchpool @@pool_config_indexes[:wafflepool]
-              send_notification "Switched #{miner} to WafflePool."
-            when "clevermining" then
-              cgminer.switchpool @@pool_config_indexes[:clevermining]
-              send_notification "Switched #{miner} to CleverMining."
-            when "coinshift" then
-              cgminer.switchpool @@pool_config_indexes[:coinshift]
-              send_notification "Switched #{miner} to CoinShift."
-            when "coinsolver" then
-              cgminer.switchpool @@pool_config_indexes[:coinsolver]
-              send_notification "Switched #{miner} to CoinSolver."
+         next if pool.scryptn == 0
+         begin
+            cgminer.switchpool pool.config_index
+            send_notification "Switched #{miner} to #{pool.name}."
+         rescue
+            send_notification "Failed to update #{miner} to #{pool.name}."
+            next
          end
-       rescue
-         send_notification "Failed to update miner #{miner}."
-         next
-       end
+      end
+      next if pool.scryptn
+
+      @@ini.profitability.scrypt_miners.each do |miner|
+          cgminer = CGMinerAPI.new miner, 4028
+          begin
+            cgminer.switchpool pool.config_index
+            send_notification "Switched #{miner} to #{pool.name}."
+          rescue
+            send_notification "Failed to update #{miner} to #{pool.name}."
+            next
+          end
+      end
+
     end
   end
 
+end
+
+class Pool
+  attr_accessor :name, :btc_per_mh, :config_index, :scryptn
+  def initialize
+    scryptn = 0
+  end
 end
 
 ini = RubyINI.load("/opt/miningtools/lib/miningtools.ini")
@@ -189,20 +192,32 @@ coinsolver_btc_per_mh   = Coinsolver.get_btc_per_mh(ini.coinsolver.address)
 zenresponse = "OK|wafflepool=#{wafflepool_btc_per_mh} clevermining=#{clevermining_btc_per_mh} coinshift=#{coinshift_btc_per_mh} multipool=#{multipool_btc_per_mh} coinsolver=#{coinsolver_btc_per_mh}"
 puts zenresponse
 
-pools = {
-  :wafflepool_btc_per_mh => wafflepool_btc_per_mh,
-  :clevermining_btc_per_mh => clevermining_btc_per_mh,
-  :coinshift_btc_per_mh => coinshift_btc_per_mh,
-  :coinsolver_btc_per_mh => coinsolver_btc_per_mh
-}
+wafflepool = Pool.new
+wafflepool.name = "wafflepool"
+wafflepool.btc_per_mh = wafflepool_btc_per_mh
+wafflepool.config_index = 0
 
-pool_config_indexes = {
-  :wafflepool => 0,
-  :clevermining => 1,
-  :coinshift => 2,
-  :coinsolver => 3
-}
+clevermining = Pool.new
+clevermining.name = "clevermining"
+clevermining.btc_per_mh = clevermining_btc_per_mh
+clevermining.config_index = 1
 
-profitability = Profitability.new ini, pools, pool_config_indexes
+coinshift = Pool.new
+coinshift.name = "coinshift"
+coinshift.btc_per_mh = coinshift_btc_per_mh
+coinshift.config_index = 2
+
+coinsolver = Pool.new
+coinsolver.name = "coinsolver"
+coinsolver.btc_per_mh = coinsolver_btc_per_mh
+coinsolver.config_index = 3
+coinsolver.scryptn = 1
+
+pools = {:wafflepool => wafflepool,
+  :clevermining => clevermining,
+  :coinshift => coinshift,
+  :coinsolver => coinsolver}
+
+profitability = Profitability.new ini, pools
 profitability.mine_most_profitable
 

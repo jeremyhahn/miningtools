@@ -9,7 +9,7 @@ class CleverMining
     @@html = nil
 
     def initialize(address)
-      @@html = CloudFlare.scrape "http://clevermining.com/users/12mdN8NbiC1xRm8NaXmwJUjLi9BwTuFguT"
+      @@html = CloudFlare.scrape "http://clevermining.com/users/#{address}"
     end
 
     def hashrate
