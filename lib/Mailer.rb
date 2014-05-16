@@ -19,6 +19,7 @@ class Mailer
 From: #{params[:from_name]} <#{params[:from]}>
 To: #{params[:to_name]} <#{params[:to]}>
 Subject: #{params[:subject]}
+Date: #{Time.now.strftime("%a, %d %b %Y %H:%M:%S +0800")}
 
 #{params[:message]}
 MESSAGE

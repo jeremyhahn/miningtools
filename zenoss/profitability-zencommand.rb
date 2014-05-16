@@ -49,7 +49,7 @@ class Coinsolver
     def self.get_btc_per_mh(address)
       response = Typhoeus.get("http://www.coinsolver.com/user-details.php?account=#{address}")
       html = response.response_body
-      matcher = html.match(/([0-9]*\.?[0-9]*)\sBTC\/1Mh/)
+      matcher = html.match(/Average:<\/td><td.*([0-9]*\.?[0-9]*)BTC\/Mh/)
       return 0 if matcher == nil
       return matcher.captures[0].to_f
     end

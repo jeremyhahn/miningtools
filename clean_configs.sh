@@ -10,6 +10,7 @@ sed -i 's/^notifications\s*=\s*.*$/notifications = root@localhost/' lib/miningto
 sed -i 's/^miners\s*=\s*.*$/miners = miner01.localdomain, miner02.localdomain, miner02.localdomain/' lib/miningtools.ini
 sed -i 's/^apikey=.*$/apikey=**************/g' lib/miningtools.ini
 sed -i 's/^secret=.*$/secret=**************/g' lib/miningtools.ini
+sed -i 's/^address\s*=.*$/address=**************/g' lib/miningtools.ini
 
 sed -i 's/^hostname\s*=\s*.*$/hostname = localhost/g' puppet/modules/mining_commons/templates/miningtools.ini.erb
 sed -i 's/^fqdn\s*=\s*.*$/fqdn = localhost.localdomain/' puppet/modules/mining_commons/templates/miningtools.ini.erb
