@@ -49,8 +49,17 @@ class Coinsolver
     def self.get_btc_per_mh(address)
       response = Typhoeus.get("http://www.coinsolver.com/user-details.php?account=#{address}")
       html = response.response_body
-      matcher = html.match(/Average:<\/td><td.*([0-9]*\.?[0-9]*)BTC\/Mh/)
-      return 0 if matcher == nil
+      # mining multiple coins
+      matcher = html.match(/Average:<.*?([0-9]*\.?[0-9]*)\sBTC\/Mh/)
+      if matcher == nil
+         # mining single coin
+         matcher = html.match(/Est\sBTC\/Day\/MH\/s.*?>([0-9]*\.?[0-9]*)\s/)
+         if matcher == nil
+            # this pattern has popped up once or twice now - one last effort
+            matcher = html.match(/([0-9]*\.?[0-9]*)\sBTC\/1Mh/)
+         end
+         return 0 if matcher == nil
+      end
       return matcher.captures[0].to_f
     end
 end
