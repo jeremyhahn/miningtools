@@ -6,6 +6,7 @@ require_relative "lib/CloudFlare"
 require_relative "lib/CGMinerAPI"
 require_relative "lib/RubyINI"
 require_relative "lib/Mailer"
+require_relative "lib/SendHub.rb"
 
 class WafflePool
     def self.get_btc_per_mh
@@ -93,42 +94,79 @@ class Profitability
 
   def mine_most_profitable
 
-    most_profitable_pool = find_most_profitable_pool
+    most_profitable_scrypt_pool = find_most_profitable_scrypt_pool
+    most_profitable_scryptn_pool = find_most_profitable_scryptn_pool
+
+    timestamp = DateTime.now
+
     data = db_read
-    record = "#{most_profitable_pool}|#{DateTime.now}"
+    record = "#{most_profitable_scrypt_pool}|#{timestamp},#{most_profitable_scryptn_pool}|#{timestamp}"
 
     if data == nil
       db_write record
-      update_miners_to most_profitable_pool
+      update_scrypt_miners_to most_profitable_scrypt_pool
+      update_scryptn_miners_to most_profitable_scryptn_pool
       return nil
     end
 
-    pieces = data.split("|")
-    current_pool = pieces[0].strip
-    last_switched = DateTime.parse pieces[1]
-    time_difference = TimeDifference.between(last_switched, Time.new).in_minutes
+    scrypt_scryptn_pieces = data.split(",")
 
-    if current_pool != most_profitable_pool && time_difference > 5
-       db_write record
-       update_miners_to most_profitable_pool
+    scrypt_pieces = scrypt_scryptn_pieces[0].split("|")
+    scryptn_pieces = scrypt_scryptn_pieces[1].split("|")
+    
+    current_scrypt_pool = scrypt_pieces[0].strip
+    current_scryptn_pool = scryptn_pieces[1].strip
+    
+    last_switched_scrypt = DateTime.parse scrypt_pieces[1]
+    last_switched_scryptn = DateTime.parse scryptn_pieces[1]
+
+    scrypt_time_difference = TimeDifference.between(last_switched_scrypt, Time.new).in_minutes
+    scryptn_time_difference = TimeDifference.between(last_switched_scryptn, Time.new).in_minutes
+
+    if current_scrypt_pool != most_profitable_scrypt_pool && scrypt_time_difference > 5
+       record = "#{most_profitable_scrypt_pool}|#{timestamp},#{current_scryptn_pool}|#{last_switched_scryptn}"
+       update_scrypt_miners_to most_profitable_scrypt_pool
+       current_scrypt_pool = most_profitable_scrypt_pool
+       last_switched_scrypt = timestamp
     end
+
+    if current_scryptn_pool != most_profitable_scryptn_pool && scryptn_time_difference > 5
+       record = "#{current_scrypt_pool}|#{last_switched_scrypt},#{most_profitable_scryptn_pool}|#{timestamp}"
+       update_scryptn_miners_to most_profitable_scryptn_pool
+    end
+
+    db_write record
   end
 
-  def find_most_profitable_pool
-    most_profitable_pool = nil
-    most_profitable_btc_per_mh = 0
-    @@pools.each do |k, pool|
+  def find_most_profitable_scrypt_pool
+     most_profitable_pool = nil
+     most_profitable_btc_per_mh = 0
+     @@pools.each do |k, pool|
+      next if pool.scryptn
       if pool.btc_per_mh > most_profitable_btc_per_mh
         most_profitable_pool = pool.name
         most_profitable_btc_per_mh = pool.btc_per_mh
       end
-    end
+    end   
     return most_profitable_pool
   end
 
-  def send_notification(message)
+  def find_most_profitable_scryptn_pool
+     most_profitable_pool = nil
+     most_profitable_btc_per_mh = 0
+     @@pools.each do |k, pool|
+      next if !pool.scryptn
+      if pool.btc_per_mh > most_profitable_btc_per_mh
+        most_profitable_pool = pool.name
+        most_profitable_btc_per_mh = pool.btc_per_mh
+      end
+    end   
+    return most_profitable_pool
+  end
+
+  def send_email_notification(message)
     mailer = Mailer.new @@ini.smtp.hostname, @@ini.smtp.port
-    params = {
+    email = {
       :from => "profitability-monitor@#{@@ini.local.fqdn}",
       :to => @@ini.profitability.notifications,
       :subject => "Profitability Monitor",
@@ -137,38 +175,57 @@ class Profitability
       :password => @@ini.smtp.password,
       :starttls => @@ini.smtp.starttls
     }
-    mailer.send params
+    mailer.send email
   end
 
-  def update_miners_to(most_profitable_pool)
+  def send_sms_notification(message)
+    sh = SendHubClient.new @@ini
+    sh.sms(message)
+  end
+
+  def update_scrypt_miners_to(most_profitable_scrypt_pool)
+    scrypt_miners = @@ini.profitability.scrypt_miners
+    scrypt_miners = [scrypt_miners] if scrypt_miners.is_a? String
     @@pools.each do |k, pool|
-
-      next if pool.name != most_profitable_pool
-
-      @@ini.profitability.scryptn_miners.each do |miner|
+      next if pool.name != most_profitable_scrypt_pool
+      next if pool.scryptn # scryptn miners CAN do scrypt, but scrypt miners CAN NOT do scryptn; ie., scrypt-only asics
+      scrypt_miners.each do |miner|
          cgminer = CGMinerAPI.new miner, 4028
-         next if pool.scryptn == 0
          begin
             cgminer.switchpool pool.config_index
-            send_notification "Switched #{miner} to #{pool.name}."
+            message = "Switched #{miner} to #{pool.name}."
+            send_email_notification message
+            send_sms_notification message if @@ini.profitability.enable_sendhub
          rescue
-            send_notification "Failed to update #{miner} to #{pool.name}."
+            message = "Failed to update #{miner} to #{pool.name}."
+            send_email_notification message
+            send_sms_notification message if @@ini.profitability.enable_sendhub
             next
          end
       end
-      next if pool.scryptn
+    end
+  end
 
-      @@ini.profitability.scrypt_miners.each do |miner|
-          cgminer = CGMinerAPI.new miner, 4028
-          begin
+  def update_scryptn_miners_to(most_profitable_scryptn_pool)
+    scryptn_miners = @@ini.profitability.scryptn_miners
+    scryptn_miners = [scryptn_miners] if scryptn_miners.is_a? String
+    @@pools.each do |k, pool|
+      next if pool.name != most_profitable_scryptn_pool
+      next if !pool.scryptn
+      scryptn_miners.each do |miner|
+         cgminer = CGMinerAPI.new miner, 4028
+         begin
             cgminer.switchpool pool.config_index
-            send_notification "Switched #{miner} to #{pool.name}."
-          rescue
-            send_notification "Failed to update #{miner} to #{pool.name}."
+            message = "Switched #{miner} to #{pool.name}."
+            send_email_notification message
+            send_sms_notification message if @@ini.profitability.enable_sendhub
+         rescue
+            message = "Failed to update #{miner} to #{pool.name}."
+            send_email_notification message
+            send_sms_notification message if @@ini.profitability.enable_sendhub
             next
-          end
+         end
       end
-
     end
   end
 
@@ -213,11 +270,12 @@ coinsolver.btc_per_mh = coinsolver_btc_per_mh
 coinsolver.config_index = 3
 coinsolver.scryptn = 1
 
-pools = {:wafflepool => wafflepool,
+pools = {
+  :wafflepool => wafflepool,
   :clevermining => clevermining,
   :coinshift => coinshift,
-  :coinsolver => coinsolver}
+  :coinsolver => coinsolver
+}
 
 profitability = Profitability.new ini, pools
 profitability.mine_most_profitable
-
