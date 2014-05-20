@@ -18,19 +18,27 @@ class Coinshift
     end
 
     def hashrate
-        return @@html.match(/Accepted\<\/h4\>.*?\>([0-9]*\.?[0-9]*)\sKh\/s/).captures[0].to_f * 1000
+        matcher = @@html.match(/Accepted\<\/h4\>.*?\>([0-9]*\.?[0-9]*)\sKh\/s/)
+        return 0 if matcher == nil
+        return matcher.captures[0].to_f * 1000
     end
 
     def stalerate
-      return @@html.match(/Rejected\<\/h4\>.*?\>([0-9]*\.?[0-9]*)\sKh\/s/).captures[0] || 0
+      matcher = @@html.match(/Rejected\<\/h4\>.*?\>([0-9]*\.?[0-9]*)\sKh\/s/)
+      return 0 if matcher == nil
+      return matcher.captures[0].to_f
     end
 
     def btc_payout_total
-      return @@html.match(/All\stime\spayouts:\s\<strong\>([0-9]*\.?[0-9]*)\sBTC/).captures[0] || 0
+      matcher = @@html.match(/All\stime\spayouts:\s\<strong\>([0-9]*\.?[0-9]*)\sBTC/)
+      return 0 if matcher == nil
+      return matcher.captures[0].to_f
     end
 
     def btc_payout_expected
-      return @@html.match(/Estimated\sUnexchanged\<\/h4\>.*?\>([0-9]*\.?[0-9]*)\sBTC/).captures[0] || 0
+      matcher = @@html.match(/Estimated\sUnexchanged\<\/h4\>.*?\>([0-9]*\.?[0-9]*)\sBTC/)
+      return 0 if matcher == nil
+      return matcher.captures[0].to_f || 0
     end
 
     def btc_recently_paid
@@ -44,8 +52,8 @@ class Coinshift
         next if amount.empty?
         next if last_date != (parse_date datetime)
         btc_payout_today += amount.to_f
-      end
-      return btc_payout_today
+      end 
+      return btc_payout_today.to_f
     end
 end
 
