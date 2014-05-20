@@ -113,29 +113,33 @@ class Profitability
 
     scrypt_pieces = scrypt_scryptn_pieces[0].split("|")
     scryptn_pieces = scrypt_scryptn_pieces[1].split("|")
-    
+
     current_scrypt_pool = scrypt_pieces[0].strip
-    current_scryptn_pool = scryptn_pieces[1].strip
-    
+    current_scryptn_pool = scryptn_pieces[0].strip
+
     last_switched_scrypt = DateTime.parse scrypt_pieces[1]
     last_switched_scryptn = DateTime.parse scryptn_pieces[1]
 
     scrypt_time_difference = TimeDifference.between(last_switched_scrypt, Time.new).in_minutes
     scryptn_time_difference = TimeDifference.between(last_switched_scryptn, Time.new).in_minutes
 
+    record_needs_updating = false
+
     if current_scrypt_pool != most_profitable_scrypt_pool && scrypt_time_difference > 5
        record = "#{most_profitable_scrypt_pool}|#{timestamp},#{current_scryptn_pool}|#{last_switched_scryptn}"
        update_scrypt_miners_to most_profitable_scrypt_pool
        current_scrypt_pool = most_profitable_scrypt_pool
        last_switched_scrypt = timestamp
+       record_needs_updating = true
     end
 
     if current_scryptn_pool != most_profitable_scryptn_pool && scryptn_time_difference > 5
        record = "#{current_scrypt_pool}|#{last_switched_scrypt},#{most_profitable_scryptn_pool}|#{timestamp}"
        update_scryptn_miners_to most_profitable_scryptn_pool
+       record_needs_updating = true
     end
 
-    db_write record
+    db_write record if record_needs_updating
   end
 
   def find_most_profitable_scrypt_pool
@@ -155,7 +159,6 @@ class Profitability
      most_profitable_pool = nil
      most_profitable_btc_per_mh = 0
      @@pools.each do |k, pool|
-      next if !pool.scryptn
       if pool.btc_per_mh > most_profitable_btc_per_mh
         most_profitable_pool = pool.name
         most_profitable_btc_per_mh = pool.btc_per_mh
@@ -188,7 +191,6 @@ class Profitability
     scrypt_miners = [scrypt_miners] if scrypt_miners.is_a? String
     @@pools.each do |k, pool|
       next if pool.name != most_profitable_scrypt_pool
-      next if pool.scryptn # scryptn miners CAN do scrypt, but scrypt miners CAN NOT do scryptn; ie., scrypt-only asics
       scrypt_miners.each do |miner|
          cgminer = CGMinerAPI.new miner, 4028
          begin
@@ -211,7 +213,6 @@ class Profitability
     scryptn_miners = [scryptn_miners] if scryptn_miners.is_a? String
     @@pools.each do |k, pool|
       next if pool.name != most_profitable_scryptn_pool
-      next if !pool.scryptn
       scryptn_miners.each do |miner|
          cgminer = CGMinerAPI.new miner, 4028
          begin
