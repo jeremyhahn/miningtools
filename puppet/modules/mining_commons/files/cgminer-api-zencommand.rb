@@ -31,4 +31,3 @@ case command
    else
       puts "Invalid command: " + command
 end
-

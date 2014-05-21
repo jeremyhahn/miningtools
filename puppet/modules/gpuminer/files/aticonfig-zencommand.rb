@@ -15,7 +15,6 @@ wout.close
 werr.close
 
 stdout = rout.readlines
-#out = stdout.to_s
 
 stderr = rerr.readlines
 
@@ -35,6 +34,7 @@ stdout.each do |line|
   i += 1
 end
 
+# format for zencommand
 zenresponse = "OK|"
 i = 0
 adapters.each do |key, value|
@@ -43,7 +43,6 @@ adapters.each do |key, value|
   zenresponse += " "
   i += 1
 end
-
 puts zenresponse
 
 exit 0

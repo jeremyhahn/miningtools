@@ -10,6 +10,11 @@ class profitability {
         ensure => installed
     }
 
+    package { 'ruby-sendhub':
+        provider => 'gem',
+        ensure => installed
+    }
+
     file { "profitability-zencommand.rb":
         ensure => file,
         path => "/opt/zenoss/libexec/profitability-zencommand.rb",
