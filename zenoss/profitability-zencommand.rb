@@ -2,68 +2,15 @@
 
 require "date"
 require "time_difference"
-require_relative "lib/CloudFlare"
 require_relative "lib/CGMinerAPI"
 require_relative "lib/RubyINI"
 require_relative "lib/Mailer"
-require_relative "lib/SendHub.rb"
-
-class WafflePool
-    def self.get_btc_per_mh
-        response = Typhoeus.get("http://www.wafflepool.com/stats")
-        html = response.response_body
-        matcher = html.match(/\<\/thead\>\n\<tr\>\n\<td\>.*$\n<td.*$\n<td.*$\n<td.*right\"\>([0-9]*\.?[0-9]*)\<\/td\>/)
-        return 0 if matcher == nil
-        return matcher.captures[0].to_f
-    end
-end
-
-class CleverMining
-    def self.get_btc_per_mh
-        html = CloudFlare.scrape "http://www.clevermining.com"
-        matcher = html.match(/\<\/i\>([0-9]*\.?[0-9]*)\sBTC\/day\sper\sMH\/s\<\/a\>/)
-        return 0 if matcher == nil
-        return matcher.captures[0].to_f
-    end
-end
-
-class Coinshift
-    def self.get_btc_per_mh
-        response = Typhoeus.get("http://www.coinshift.com", followlocation: true)
-        html = response.response_body
-        matcher = html.match(/\<h1\salign.*?\>([0-9]*\.?[0-9]*)\<\/h1\>\n\s+\<h3\salign.*\>BTC\/MH\/day\<\/h3\>/)
-        return 0 if matcher == nil
-        return matcher.captures[0].to_f      
-    end
-end
-
-class Multipool
-    def self.get_btc_per_mh
-        response = Typhoeus.get("http://api.multipool.us/api.php")
-        body = response.response_body.gsub(/<!--.*->/, "")
-        json = JSON.parse(body)
-        return json["prof"]["scrypt_1d"].to_f
-    end
-end
-
-class Coinsolver
-    def self.get_btc_per_mh(address)
-      response = Typhoeus.get("http://www.coinsolver.com/user-details.php?account=#{address}")
-      html = response.response_body
-      # mining multiple coins
-      matcher = html.match(/Average:<.*?([0-9]*\.?[0-9]*)\sBTC\/Mh/)
-      if matcher == nil
-         # mining single coin
-         matcher = html.match(/Est\sBTC\/Day\/MH\/s.*?>([0-9]*\.?[0-9]*)\s/)
-         if matcher == nil
-            # this pattern has popped up once or twice now - one last effort
-            matcher = html.match(/([0-9]*\.?[0-9]*)\sBTC\/1Mh/)
-         end
-         return 0 if matcher == nil
-      end
-      return matcher.captures[0].to_f
-    end
-end
+require_relative "lib/TextBelt"
+require_relative "lib/WafflePool"
+require_relative "lib/CleverMining"
+require_relative "lib/Coinshift"
+require_relative "lib/Coinsolver"
+require_relative "lib/Multipool"
 
 class Profitability
 
@@ -182,8 +129,8 @@ class Profitability
   end
 
   def send_sms_notification(message)
-    sh = SendHubClient.new @@ini
-    sh.sms(message)
+    textbelt = TextBelt.new @@ini
+    textbelt.send(message)
   end
 
   def update_scrypt_miners_to(most_profitable_scrypt_pool)
@@ -241,11 +188,11 @@ end
 
 ini = RubyINI.load("/opt/miningtools/lib/miningtools.ini")
 
-wafflepool_btc_per_mh   = WafflePool.get_btc_per_mh
-clevermining_btc_per_mh = CleverMining.get_btc_per_mh
-coinshift_btc_per_mh    = Coinshift.get_btc_per_mh
-multipool_btc_per_mh    = Multipool.get_btc_per_mh
-coinsolver_btc_per_mh   = Coinsolver.get_btc_per_mh(ini.coinsolver.address)
+wafflepool_btc_per_mh   = WafflePool.btc_per_mh
+clevermining_btc_per_mh = CleverMining.btc_per_mh
+coinshift_btc_per_mh    = Coinshift.btc_per_mh
+multipool_btc_per_mh    = Multipool.btc_per_mh
+coinsolver_btc_per_mh   = Coinsolver.btc_per_mh(ini.coinsolver.address)
 
 zenresponse = "OK|wafflepool=#{wafflepool_btc_per_mh} clevermining=#{clevermining_btc_per_mh} coinshift=#{coinshift_btc_per_mh} multipool=#{multipool_btc_per_mh} coinsolver=#{coinsolver_btc_per_mh}"
 puts zenresponse
